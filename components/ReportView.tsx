@@ -2,6 +2,7 @@
 
 import type { InterviewerSession } from "@/app/report/[id]/page";
 import type { FindingSeverity, ReviewComment } from "@/lib/types";
+import { AnnotatedCode, FixDiff } from "@/components/ReportCode";
 
 const SEVERITY_STYLES: Record<FindingSeverity, string> = {
   critical: "bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300",
@@ -61,6 +62,24 @@ export function ReportView({ session }: { session: InterviewerSession }) {
           </div>
         </Card>
       ) : null}
+
+      {/* Reviewed code with inline annotations */}
+      <section>
+        <h2 className="mb-1 text-lg font-semibold">Reviewed code</h2>
+        <p className="mb-3 text-sm text-neutral-500">
+          The candidate&apos;s comments shown on the lines they were left on.
+          Dots in the gutter mark where the planted findings live
+          (<span className="mx-1 inline-block h-2 w-2 rounded-full bg-red-500" /> critical
+          <span className="mx-1 ml-3 inline-block h-2 w-2 rounded-full bg-amber-500" /> major
+          <span className="mx-1 ml-3 inline-block h-2 w-2 rounded-full bg-neutral-400" /> minor).
+        </p>
+        <AnnotatedCode
+          files={session.files}
+          comments={comments}
+          findings={findings}
+          grading={grading}
+        />
+      </section>
 
       {/* Expected findings coverage */}
       <section>
@@ -224,24 +243,20 @@ export function ReportView({ session }: { session: InterviewerSession }) {
                 </Card>
               );
             })}
-            {session.fixFiles && (
-              <details className="rounded-xl border border-neutral-200 bg-white p-5 dark:border-neutral-800 dark:bg-neutral-900">
-                <summary className="cursor-pointer text-sm font-medium">
-                  View submitted code
-                </summary>
-                {session.fixFiles.map((f) => (
-                  <div key={f.path} className="mt-4">
-                    <p className="mb-1 font-mono text-xs text-neutral-500">{f.path}</p>
-                    <pre className="overflow-x-auto rounded-lg bg-neutral-50 p-4 font-mono text-xs leading-5 dark:bg-neutral-950">
-                      {f.content}
-                    </pre>
-                  </div>
-                ))}
-              </details>
-            )}
           </div>
         ) : null}
       </section>
+
+      {/* Fix diff — shown as soon as a fix is submitted, even while evaluation runs */}
+      {session.fixFiles && (
+        <section>
+          <h2 className="mb-1 text-lg font-semibold">Submitted fix</h2>
+          <p className="mb-3 text-sm text-neutral-500">
+            The candidate&apos;s changes against the original PR.
+          </p>
+          <FixDiff original={session.files} fixed={session.fixFiles} />
+        </section>
+      )}
     </div>
   );
 }

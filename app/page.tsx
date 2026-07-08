@@ -3,6 +3,7 @@ import type { Language } from "@/lib/types";
 import { CreateSessionForm } from "@/components/CreateSessionForm";
 import { SessionList } from "@/components/SessionList";
 
+// Auth for this page is enforced by proxy.ts (redirects to /login).
 export default function Home() {
   const challengeSummaries = challenges.map((c) => ({
     id: c.id,

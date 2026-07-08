@@ -1,36 +1,60 @@
-## Inter-View
+# Inter-View
 
-Inter-View is a small coding interview app built with Next.js.
+PR-review-style live coding interviews, graded by AI in the background.
 
-## Required environment variables
+The interviewer picks a challenge and a language, sends the candidate a link, and
+the candidate reviews a deliberately flawed pull request — leaving comments on
+line numbers, GitHub style. When they submit, the AI Gateway grades the review
+against the defects we planted in the code, and the interviewer watches the
+results appear on a private report page. Part 2 asks the candidate to fix the
+code, which is evaluated the same way.
 
-Set `INTERVIEWER_PASSWORD` before running or deploying the app. The interviewer
-console, session creation/list endpoints, and report views require this shared
-password. Candidate review links stay accessible without login.
+## Flow
 
-## Getting Started
+1. **Interviewer** signs in at `/login` (shared password), creates a session on
+   `/` → gets a **candidate link** (`/review/:id`) and a private **report
+   link** (`/report/:id?key=…`).
+2. **Candidate** opens their link, reviews the PR, clicks line numbers to leave
+   comments, then submits.
+3. AI grading runs in the background (`after()` + AI Gateway) — the report page
+   shows which planted findings were caught / partially caught / missed, plus an
+   assessment of any extra comments, strengths, gaps and a 0–100 score.
+4. The candidate is moved to **Part 2 — fix the code**: they edit the files and
+   submit; the AI judges each planted defect as fixed / partially fixed / not
+   fixed and flags regressions.
 
-First, install dependencies and run the development server:
+## Challenges
+
+| Challenge | Languages | What it tests |
+| --- | --- | --- |
+| LRU cache implementation | JavaScript, TypeScript, Python | Data-structure correctness: recency updates, eviction order, capacity validation |
+| Users REST API | JavaScript (Express), Python (FastAPI) | SQL injection, leaked password hashes, MD5, validation, unbounded pagination, fire-and-forget DELETE |
+| API rate limiter | JavaScript, Python | Spoofable client id, memory leak, off-by-one, multi-instance design |
+| Payment webhook handler | JavaScript, Python | Signature verification, idempotency, float money math, silent failure modes |
+
+Challenges live in [`lib/challenges/`](lib/challenges). Each defines the PR
+files per language plus the planted findings; a finding's line number is
+resolved from a unique code snippet ("anchor") at load time, so nothing breaks
+when the sample code changes. Adding a challenge = adding one file and
+registering it in [`lib/challenges/index.ts`](lib/challenges/index.ts).
+
+## Setup
 
 ```bash
-pnpm install
-INTERVIEWER_PASSWORD=change-me pnpm dev
+npm install
+cp .env.example .env.local   # fill in AI_GATEWAY_API_KEY + INTERVIEWER_PASSWORD
+npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) and sign in with the
-shared interviewer password.
+Deploy with `vercel deploy` (or `vercel deploy --prod`) and set the same env
+vars on the project.
 
-## Learn More
+## Known limitations (MVP)
 
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- **Sessions are stored in memory** (`lib/store.ts`). Fine locally and for
+  short interviews on a warm instance, but not durable on serverless — swap the
+  store for Redis/Postgres from the Vercel Marketplace before real use. The
+  rest of the app only talks to the store module's functions.
+- Interviewer auth is a single shared password in an env var; the report link
+  additionally requires the per-session key.
+- The fix phase uses a plain textarea, not a full code editor.
