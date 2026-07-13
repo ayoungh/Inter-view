@@ -1,4 +1,4 @@
-import type { Challenge } from "../types";
+import { defineChallenge } from "./helpers";
 
 const jsContent = `const express = require('express');
 const md5 = require('md5');
@@ -85,7 +85,7 @@ def delete_user(user_id: str):
     db.execute("DELETE FROM users WHERE id = :id", {"id": user_id})
 `;
 
-export const usersApi: Challenge = {
+export const usersApi = defineChallenge({
   id: "users-api",
   title: "Users REST API endpoints",
   summary:
@@ -209,4 +209,4 @@ export const usersApi: Challenge = {
       },
     },
   },
-};
+});

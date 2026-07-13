@@ -8,9 +8,24 @@ import type {
   GradingResult,
   ResolvedFinding,
   Session,
+  RubricEvidence,
 } from "./types";
 
 const MODEL = process.env.INTERVIEW_GRADER_MODEL ?? "anthropic/claude-sonnet-5";
+
+const liveAssessmentSchema = z.object({
+  evidence: z.array(z.object({ findingId: z.string(), state: z.enum(["not-discussed", "developing", "caught", "partial", "contradicted"]), confidence: z.enum(["low", "medium", "high"]), commentIds: z.array(z.string()), revisionIds: z.array(z.string()), checkRunIds: z.array(z.string()), note: z.string().max(500) })),
+  summary: z.string().max(800),
+});
+
+export async function gradeLiveEvidence(session: Session, findings: ResolvedFinding[]): Promise<{ evidence: RubricEvidence[]; summary: string }> {
+  const { output } = await generateText({
+    model: MODEL,
+    output: Output.object({ schema: liveAssessmentSchema }),
+    prompt: `Assess preliminary evidence during a live code-review interview. Never produce a score or hiring recommendation.\n\nRubric:\n${renderFindings(findings)}\n\nComments:\n${session.comments.map((comment) => `${comment.id} ${comment.file}:${comment.line}-${comment.endLine ?? comment.line}: ${comment.body}`).join("\n") || "(none)"}\n\nLatest revision id: ${session.latestRevision?.id ?? "none"}\nChanged files: ${(session.latestRevision?.files ?? []).filter((file) => (file.savedContent ?? file.headContent) !== file.headContent).map((file) => file.path).join(", ") || "none"}\n\nCheck runs: ${session.checkRuns.map((run) => `${run.id} ${run.status}`).join(", ") || "none"}\n\nReturn one evidence entry per rubric finding. Cite only IDs present above. Treat proximity without substantive reasoning as developing or partial, not caught.`,
+  });
+  return output as { evidence: RubricEvidence[]; summary: string };
+}
 
 function numberLines(content: string): string {
   return content
@@ -21,7 +36,7 @@ function numberLines(content: string): string {
 
 function renderFiles(files: ChallengeFile[]): string {
   return files
-    .map((f) => `### ${f.path}\n\`\`\`\n${numberLines(f.content)}\n\`\`\``)
+    .map((f) => `### ${f.path}\n\`\`\`\n${numberLines(f.savedContent ?? f.headContent)}\n\`\`\``)
     .join("\n\n");
 }
 

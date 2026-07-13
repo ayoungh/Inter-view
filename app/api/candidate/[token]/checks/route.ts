@@ -1,0 +1,4 @@
+import { NextResponse } from "next/server";
+import { getCandidateSession } from "@/lib/store";
+import { queueCheckRun } from "@/lib/server/jobs";
+export async function POST(_: Request, { params }: { params: Promise<{ token: string }> }) { const { token } = await params; const session = await getCandidateSession(token); if (!session || session.status !== "fixing") return NextResponse.json({ error: "Checks unavailable" }, { status: 409 }); const files = session.fixFiles ?? session.latestRevision?.files; if (!files) return NextResponse.json({ error: "Save a revision first" }, { status: 409 }); const workflow = await queueCheckRun(session.id, session.revision); const result = await workflow.returnValue; return "run" in result ? NextResponse.json({ run: result.run }) : NextResponse.json({ error: "Check run became stale" }, { status: 409 }); }

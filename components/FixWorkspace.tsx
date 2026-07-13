@@ -1,105 +1,29 @@
 "use client";
 
-import { useState } from "react";
+import dynamic from "next/dynamic";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { CheckCircle2, FileCode2, GitCompareArrows, LoaderCircle, Play, Send } from "lucide-react";
 import type { CandidateSession } from "@/lib/candidate";
+import type { CheckRun } from "@/lib/types";
+import { PrTop } from "./ReviewWorkspace";
+import { PrDiff } from "./PrDiff";
+const MonacoEditor = dynamic(() => import("@monaco-editor/react"), { ssr: false });
 
-interface Props {
-  session: CandidateSession;
-  onPhaseChange: () => void;
+export function FixWorkspace({ session, token, onPhaseChange }: { session: CandidateSession; token: string; onPhaseChange: () => void }) {
+  const seed = session.fixFiles ?? session.files.map((file) => ({ ...file, savedContent: file.headContent }));
+  const [files, setFiles] = useState(seed); const [active, setActive] = useState(seed[0]?.path ?? ""); const [view, setView] = useState<"edit"|"diff"|"checks">("edit"); const [busy, setBusy] = useState(false); const [runs, setRuns] = useState(session.checkRuns); const timer = useRef<ReturnType<typeof setTimeout> | null>(null); const latest = useRef(files);
+  const file = files.find((item) => item.path === active) ?? files[0];
+  const changed = useMemo(() => files.filter((item) => (item.savedContent ?? item.headContent) !== item.headContent).length, [files]);
+  async function save(current = latest.current) { const res = await fetch(`/api/candidate/${token}/revision`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ files: current }) }); return res.ok; }
+  function edit(value: string | undefined) { const next = files.map((item) => item.path === file.path ? { ...item, savedContent: value ?? "" } : item); setFiles(next); if (timer.current) clearTimeout(timer.current); timer.current = setTimeout(() => void save(next), 8_000); }
+  useEffect(() => { latest.current = files; }, [files]);
+  useEffect(() => () => { if (timer.current) clearTimeout(timer.current); }, []);
+  async function checks() { setBusy(true); await save(); const res = await fetch(`/api/candidate/${token}/checks`, { method: "POST" }); const data = await res.json(); if (res.ok) { setRuns((items) => [data.run, ...items]); setView("checks"); } setBusy(false); }
+  async function submit() { setBusy(true); await save(); const res = await fetch(`/api/candidate/${token}/fix`, { method: "POST" }); if (res.ok) onPhaseChange(); else setBusy(false); }
+  return <main className="pr-app fix-app"><PrTop session={session} phase="Implementation"/><div className="fix-toolbar"><div><span className="open-pill amber">Part 2 of 2</span><h1>Implement your review</h1><p>{session.challenge.fixInstructions}</p></div><div className="toolbar-actions"><button onClick={checks} disabled={busy}><Play/>Run checks</button><button className="primary" onClick={submit} disabled={busy}>{busy ? <LoaderCircle className="spin"/> : <Send/>}Submit changes</button></div></div>
+    <nav className="edit-tabs"><button className={view === "edit" ? "active" : ""} onClick={() => setView("edit")}><FileCode2/>Edit</button><button className={view === "diff" ? "active" : ""} onClick={() => setView("diff")}><GitCompareArrows/>Working tree <b>{changed}</b></button><button className={view === "checks" ? "active" : ""} onClick={() => setView("checks")}><CheckCircle2/>Checks <b>{runs.length}</b></button></nav>
+    <div className="editor-layout"><aside className="file-rail"><h3>Explorer</h3>{files.map((item) => <button className={item.path === file.path ? "active" : ""} key={item.path} onClick={() => setActive(item.path)}><FileCode2/><span>{item.path}</span>{(item.savedContent ?? item.headContent) !== item.headContent ? <i>M</i> : null}</button>)}</aside><section className="editor-main">
+      {view === "edit" ? <><div className="editor-breadcrumb">{file.path}<span>{changed ? `${changed} modified` : "No changes"}</span></div><MonacoEditor height="calc(100vh - 250px)" language={session.language === "python" ? "python" : session.language} value={file.savedContent ?? file.headContent} onChange={edit} theme="vs" options={{ minimap: { enabled: false }, fontSize: 13, fontFamily: "var(--font-geist-mono)", scrollBeyondLastLine: false, padding: { top: 14 }, automaticLayout: true }}/></> : view === "diff" ? <div className="diff-stack">{files.filter((item) => (item.savedContent ?? item.headContent) !== item.headContent).map((item) => <PrDiff key={item.path} file={{ ...item, baseContent: item.headContent }}/>)}</div> : <Checks runs={runs} busy={busy}/>}
+    </section></div></main>;
 }
-
-export function FixWorkspace({ session, onPhaseChange }: Props) {
-  const initial = session.fixFiles ?? session.files;
-  const [contents, setContents] = useState<Record<string, string>>(
-    Object.fromEntries(initial.map((f) => [f.path, f.content])),
-  );
-  const [activeFile, setActiveFile] = useState(session.files[0]?.path ?? "");
-  const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState("");
-
-  const paths = session.files.map((f) => f.path);
-
-  async function submitFix() {
-    if (
-      !window.confirm(
-        "Submit your fixed code? This ends the exercise — you won't be able to edit afterwards.",
-      )
-    )
-      return;
-    setSubmitting(true);
-    setError("");
-    try {
-      const res = await fetch(`/api/sessions/${session.id}/fix`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          files: paths.map((path) => ({ path, content: contents[path] ?? "" })),
-        }),
-      });
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.error ?? "Failed to submit");
-      }
-      onPhaseChange();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to submit");
-      setSubmitting(false);
-    }
-  }
-
-  return (
-    <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-8 sm:px-6">
-      <div className="mb-6 rounded-xl border border-neutral-200 bg-white p-5 dark:border-neutral-800 dark:bg-neutral-900">
-        <div className="flex items-center gap-2 text-xs text-neutral-500">
-          <span className="rounded-full bg-amber-100 px-2 py-0.5 font-medium text-amber-700 dark:bg-amber-950 dark:text-amber-300">
-            Part 2 of 2
-          </span>
-          <span>Review submitted ✓</span>
-        </div>
-        <h1 className="mt-2 text-xl font-semibold">Now fix the code</h1>
-        <p className="mt-2 text-sm leading-relaxed text-neutral-600 dark:text-neutral-400">
-          {session.challenge.fixInstructions}
-        </p>
-      </div>
-
-      <div className="flex flex-wrap gap-1">
-        {paths.map((path) => (
-          <button
-            key={path}
-            type="button"
-            onClick={() => setActiveFile(path)}
-            className={`rounded-t-lg border border-b-0 px-4 py-2 font-mono text-xs ${
-              path === activeFile
-                ? "border-neutral-200 bg-white font-semibold dark:border-neutral-800 dark:bg-neutral-900"
-                : "border-transparent text-neutral-500 hover:text-neutral-800 dark:hover:text-neutral-200"
-            }`}
-          >
-            {path}
-          </button>
-        ))}
-      </div>
-
-      <textarea
-        value={contents[activeFile] ?? ""}
-        onChange={(e) =>
-          setContents((prev) => ({ ...prev, [activeFile]: e.target.value }))
-        }
-        spellCheck={false}
-        rows={Math.max(24, (contents[activeFile] ?? "").split("\n").length + 2)}
-        className="w-full resize-y rounded-b-xl rounded-tr-xl border border-neutral-200 bg-white p-4 font-mono text-[13px] leading-6 focus:outline-indigo-500 dark:border-neutral-800 dark:bg-neutral-900"
-      />
-
-      <div className="mt-4 flex items-center justify-end gap-4">
-        {error && <p className="text-sm text-red-600">{error}</p>}
-        <button
-          type="button"
-          onClick={submitFix}
-          disabled={submitting}
-          className="rounded-md bg-indigo-600 px-6 py-2.5 text-sm font-medium text-white hover:bg-indigo-500 disabled:opacity-50"
-        >
-          {submitting ? "Submitting…" : "Submit fixed code"}
-        </button>
-      </div>
-    </main>
-  );
-}
+function Checks({ runs, busy }: { runs: CheckRun[]; busy: boolean }) { return <div className="checks-view"><h2>Checks</h2>{busy ? <p><LoaderCircle className="spin"/>Running in an isolated sandbox…</p> : null}{runs.length === 0 ? <div className="checks-empty">Run checks when you are ready. Candidate code executes with network access denied.</div> : runs.map((run) => <article key={run.id}><header><CheckCircle2/><strong>Revision {run.revision}</strong><span className={`check-${run.status}`}>{run.status}</span><time>{run.completedAt && `${run.completedAt - run.createdAt} ms`}</time></header>{run.results.map((result) => <details key={result.checkId}><summary>{result.name}<span>{result.durationMs} ms · {result.status}</span></summary><pre>{result.output || (result.visibility === "hidden" ? `Hidden ${result.category} checks ${result.status}.` : "No output")}</pre></details>)}</article>)}</div>; }

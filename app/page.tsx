@@ -11,6 +11,7 @@ export default function Home() {
     summary: c.summary,
     languages: Object.keys(c.variants) as Language[],
     findingCount: c.findings.length,
+    difficulty: c.difficulty,
   }));
 
   return (
@@ -23,9 +24,8 @@ export default function Home() {
           </span>
         </h1>
         <p className="mt-2 max-w-2xl text-sm text-neutral-500 dark:text-neutral-400">
-          Pick a challenge and a language, send the candidate their link, and
-          watch the AI-graded report as they review the PR and then fix the
-          code.
+          Create a durable curated PR, send the capability link, and watch
+          comments, code revisions, checks, and preliminary AI evidence live.
         </p>
       </header>
 

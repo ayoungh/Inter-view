@@ -7,10 +7,7 @@ function isProtectedRequest(req: NextRequest): boolean {
 
   if (path === "/") return true;
   if (path.startsWith("/report/")) return true;
-  if (path === "/api/sessions") return true;
-  if (path.startsWith("/api/sessions/") && req.nextUrl.searchParams.has("key")) {
-    return true;
-  }
+  if (path.startsWith("/api/sessions")) return true;
 
   return false;
 }

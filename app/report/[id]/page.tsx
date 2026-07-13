@@ -1,134 +1,22 @@
 "use client";
 
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { useParams, useSearchParams } from "next/navigation";
-import type {
-  ChallengeFile,
-  FixEvaluation,
-  GradingResult,
-  JobStatus,
-  Language,
-  ResolvedFinding,
-  ReviewComment,
-  SessionStatus,
-} from "@/lib/types";
-import { LANGUAGE_LABELS } from "@/lib/types";
+import type { ChallengeFile, Session, SessionEvent, ResolvedFinding } from "@/lib/types";
 import { ReportView } from "@/components/ReportView";
 
-export interface InterviewerSession {
-  id: string;
-  status: SessionStatus;
-  language: Language;
-  candidateName: string;
-  challenge: {
-    id: string;
-    title: string;
-    prTitle: string;
-    prDescription: string;
-    fixInstructions: string;
-  };
-  files: ChallengeFile[];
-  comments: ReviewComment[];
-  overallNote: string;
-  fixFiles: ChallengeFile[] | null;
-  findings?: ResolvedFinding[];
-  gradingStatus?: JobStatus;
-  grading?: GradingResult | null;
-  gradingError?: string | null;
-  fixStatus?: JobStatus;
-  fixEvaluation?: FixEvaluation | null;
-  fixError?: string | null;
-}
-
-export default function ReportPage() {
-  return (
-    <Suspense fallback={<p className="p-10 text-sm text-neutral-500">Loading…</p>}>
-      <Report />
-    </Suspense>
-  );
-}
-
+export interface InterviewerSession extends Session { files: ChallengeFile[]; findings: ResolvedFinding[] }
+export default function ReportPage() { return <Suspense fallback={<p className="p-10 text-sm text-neutral-500">Loading live review…</p>}><Report/></Suspense>; }
 function Report() {
-  const { id } = useParams<{ id: string }>();
-  const searchParams = useSearchParams();
-  const key = searchParams.get("key") ?? "";
-  const [session, setSession] = useState<InterviewerSession | null>(null);
-  const [error, setError] = useState("");
-
+  const { id } = useParams<{ id: string }>(); const key = useSearchParams().get("key") ?? ""; const [session, setSession] = useState<InterviewerSession | null>(null); const [events, setEvents] = useState<SessionEvent[]>([]); const [error, setError] = useState(""); const cursor = useRef(0);
+  const load = useCallback(async () => { const res = await fetch(`/api/sessions/${id}?key=${encodeURIComponent(key)}`, { cache: "no-store" }); if (!res.ok) { setError(res.status === 404 ? "This report link is invalid or has expired." : "Failed to load the interview."); return; } setSession(await res.json()); setError(""); }, [id,key]);
+  useEffect(() => { const timer = setTimeout(() => void load(), 0); return () => clearTimeout(timer); }, [load]);
   useEffect(() => {
-    let cancelled = false;
-
-    async function load() {
-      const res = await fetch(`/api/sessions/${id}?key=${encodeURIComponent(key)}`);
-      if (cancelled) return;
-
-      if (!res.ok) {
-        setError(
-          res.status === 401
-            ? "Sign in to view interviewer reports."
-            : res.status === 404
-              ? "Session not found."
-              : "Failed to load session.",
-        );
-        return;
-      }
-
-      const data: InterviewerSession = await res.json();
-      if (cancelled) return;
-
-      if (data.findings === undefined) {
-        setError("This report link is missing a valid interviewer key.");
-        return;
-      }
-
-      setError("");
-      setSession(data);
-    }
-
-    void load();
-    const interval = setInterval(() => {
-      void load();
-    }, 4000);
-
-    return () => {
-      cancelled = true;
-      clearInterval(interval);
-    };
-  }, [id, key]);
-
-  if (error) {
-    return (
-      <main className="mx-auto max-w-2xl px-6 py-24 text-center">
-        <h1 className="text-xl font-semibold">Can&apos;t open report</h1>
-        <p className="mt-2 text-sm text-neutral-500">{error}</p>
-      </main>
-    );
-  }
-  if (!session) {
-    return <p className="p-10 text-sm text-neutral-500">Loading report…</p>;
-  }
-
-  return (
-    <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-8 sm:px-6">
-      <header className="mb-8">
-        <p className="text-xs uppercase tracking-wide text-neutral-500">
-          Interview report
-        </p>
-        <h1 className="mt-1 text-2xl font-bold">
-          {session.candidateName} · {session.challenge.title}
-        </h1>
-        <p className="mt-1 text-sm text-neutral-500">
-          {LANGUAGE_LABELS[session.language]} ·{" "}
-          {session.status === "review"
-            ? "candidate is still reviewing"
-            : session.status === "fixing"
-              ? "review submitted — candidate is fixing the code"
-              : "completed"}{" "}
-          · {session.comments.length} comment
-          {session.comments.length === 1 ? "" : "s"}
-        </p>
-      </header>
-      <ReportView session={session} />
-    </main>
-  );
+    let source: EventSource | null = null; let fallback: ReturnType<typeof setInterval> | null = null; let stopped = false;
+    function connect() { if (stopped) return; source = new EventSource(`/api/sessions/${id}/events?key=${encodeURIComponent(key)}&cursor=${cursor.current}`); const types = ["session.created","comment.added","comment.updated","comment.deleted","review.submitted","revision.saved","check.completed","assessment.updated","fix.submitted","note.updated"]; types.forEach((type) => source?.addEventListener(type, (message) => { const item = JSON.parse((message as MessageEvent).data) as SessionEvent; cursor.current = Math.max(cursor.current, item.id); setEvents((items) => [...items.filter((e) => e.id !== item.id), item].slice(-200)); void load(); })); source.addEventListener("rotate", () => { source?.close(); setTimeout(connect, 200); }); source.onerror = () => { source?.close(); if (!fallback) fallback = setInterval(() => void load(), 4_000); setTimeout(connect, 3_000); }; }
+    connect(); return () => { stopped = true; source?.close(); if (fallback) clearInterval(fallback); };
+  }, [id,key,load]);
+  if (error) return <main className="empty-tab"><h1>Can&apos;t open live review</h1><p>{error}</p></main>;
+  if (!session) return <p className="p-10 text-sm text-neutral-500">Connecting to live session…</p>;
+  return <ReportView session={session} reportKey={key} events={events}/>;
 }

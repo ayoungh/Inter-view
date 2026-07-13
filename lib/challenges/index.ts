@@ -8,12 +8,26 @@ import { lruCache } from "./lru-cache";
 import { usersApi } from "./users-api";
 import { rateLimiter } from "./rate-limiter";
 import { paymentWebhook } from "./payment-webhook";
+import {
+  csvImport,
+  flakyTests,
+  orderTransfer,
+  queueWorker,
+  reactSearch,
+  tenantDocuments,
+} from "./expanded";
 
 export const challenges: Challenge[] = [
   lruCache,
   usersApi,
   rateLimiter,
   paymentWebhook,
+  reactSearch,
+  orderTransfer,
+  queueWorker,
+  tenantDocuments,
+  csvImport,
+  flakyTests,
 ];
 
 export function getChallenge(id: string): Challenge | undefined {
@@ -44,9 +58,9 @@ export function resolveFindings(
     if (anchor) {
       const file = variant.files.find((f) => f.path === anchor.file);
       if (file) {
-        const idx = file.content.indexOf(anchor.anchor);
+        const idx = file.headContent.indexOf(anchor.anchor);
         if (idx >= 0) {
-          line = file.content.slice(0, idx).split("\n").length;
+          line = file.headContent.slice(0, idx).split("\n").length;
         }
       }
     }

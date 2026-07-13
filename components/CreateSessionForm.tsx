@@ -9,6 +9,7 @@ interface ChallengeSummary {
   summary: string;
   languages: Language[];
   findingCount: number;
+  difficulty: "mid" | "senior";
 }
 
 interface CreatedLinks {
@@ -50,10 +51,9 @@ export function CreateSessionForm({
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Failed to create session");
-      const origin = window.location.origin;
       setLinks({
-        candidateUrl: `${origin}/review/${data.id}`,
-        reportUrl: `${origin}/report/${data.id}?key=${data.interviewerKey}`,
+        candidateUrl: data.candidateUrl,
+        reportUrl: data.reportUrl,
       });
       window.dispatchEvent(new Event("sessions-changed"));
     } catch (err) {
@@ -87,8 +87,8 @@ export function CreateSessionForm({
           >
             <div className="flex items-center justify-between gap-2">
               <span className="font-medium">{c.title}</span>
-              <span className="shrink-0 rounded-full bg-neutral-100 px-2 py-0.5 text-xs text-neutral-500 dark:bg-neutral-800 dark:text-neutral-400">
-                {c.findingCount} planted issues
+              <span className="shrink-0 rounded-full bg-neutral-100 px-2 py-0.5 text-xs text-neutral-500">
+                {c.difficulty} · {c.findingCount} rubric areas
               </span>
             </div>
             <p className="mt-1 text-xs leading-relaxed text-neutral-500 dark:text-neutral-400">

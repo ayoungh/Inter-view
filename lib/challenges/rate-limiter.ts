@@ -1,4 +1,4 @@
-import type { Challenge } from "../types";
+import { defineChallenge } from "./helpers";
 
 const jsContent = `const requests = {};
 
@@ -54,7 +54,7 @@ def rate_limit(client_ip, forwarded_for=None):
     return True
 `;
 
-export const rateLimiter: Challenge = {
+export const rateLimiter = defineChallenge({
   id: "rate-limiter",
   title: "API rate-limiting middleware",
   summary:
@@ -162,4 +162,4 @@ export const rateLimiter: Challenge = {
       },
     },
   },
-};
+});

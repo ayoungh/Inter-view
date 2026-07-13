@@ -1,4 +1,4 @@
-import type { Challenge } from "../types";
+import { defineChallenge } from "./helpers";
 
 const jsContent = `const express = require('express');
 const orders = require('../services/orders');
@@ -46,7 +46,7 @@ async def payment_webhook(request: Request):
     return {"received": True}
 `;
 
-export const paymentWebhook: Challenge = {
+export const paymentWebhook = defineChallenge({
   id: "payment-webhook",
   title: "Payment webhook handler",
   summary:
@@ -155,4 +155,4 @@ export const paymentWebhook: Challenge = {
       },
     },
   },
-};
+});

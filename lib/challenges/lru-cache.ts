@@ -1,4 +1,4 @@
-import type { Challenge } from "../types";
+import { defineChallenge } from "./helpers";
 
 const jsContent = `class LRUCache {
   constructor(capacity) {
@@ -91,7 +91,7 @@ const pyContent = `class LRUCache:
         return len(self.store)
 `;
 
-export const lruCache: Challenge = {
+export const lruCache = defineChallenge({
   id: "lru-cache",
   title: "LRU Cache implementation",
   summary:
@@ -205,4 +205,4 @@ export const lruCache: Challenge = {
       },
     },
   },
-};
+});

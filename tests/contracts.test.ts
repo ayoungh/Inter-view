@@ -1,0 +1,5 @@
+import { describe, expect, it } from "vitest";
+import { challenges, getVariant } from "@/lib/challenges";
+import { toCandidateSession } from "@/lib/candidate";
+import type { Session } from "@/lib/types";
+describe("candidate payload boundary", () => { it("never serializes rubric, hidden checks, AI, reference code, or notes", () => { const challenge = structuredClone(challenges[0]); const session: Session = { id:"s",challenge,language:"javascript",candidateName:"Ada",createdAt:1,status:"review",comments:[],overallNote:"",gradingStatus:"none",fixStatus:"none",revision:0,checkRuns:[],liveAssessment:{id:"ai",basedOnEventId:1,revision:1,status:"done",evidence:[],summary:"secret analysis",createdAt:1},interviewerNote:{body:"private",updatedAt:1} }; const json = JSON.stringify(toCandidateSession(session)); expect(json).not.toContain("secret analysis"); expect(json).not.toContain("private"); expect(json).not.toContain("findings"); expect(json).not.toContain("hidden-tests"); expect(json).not.toContain("referenceFiles"); expect(getVariant(challenge,"javascript")?.checks.some((c)=>c.visibility==="hidden")).toBe(true); }); });

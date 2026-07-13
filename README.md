@@ -1,60 +1,39 @@
 # Inter-View
 
-PR-review-style live coding interviews, graded by AI in the background.
+A durable, live pull-request interview environment. Candidates review a curated PR, leave GitHub-style draft comments, submit one review, edit the proposed code in Monaco, and run visible plus hidden checks. Interviewers watch comments, revisions, checks, preliminary AI rubric coverage, and a private timeline in real time.
 
-The interviewer picks a challenge and a language, sends the candidate a link, and
-the candidate reviews a deliberately flawed pull request — leaving comments on
-line numbers, GitHub style. When they submit, the AI Gateway grades the review
-against the defects we planted in the code, and the interviewer watches the
-results appear on a private report page. Part 2 asks the candidate to fix the
-code, which is evaluated the same way.
+## Architecture
 
-## Flow
+- **Durable sessions:** Neon Postgres, an append-only indexed event log, Drizzle schema, and checked-in SQL migrations.
+- **Capabilities:** candidate URLs contain a random capability token; interviewer reports use a separate report token and the shared interviewer sign-in. Only hashes are stored. The report token is separately encrypted so authenticated interviewers can reopen sessions.
+- **Live updates:** authenticated SSE polls event IDs in cursor order, emits 15-second heartbeats, rotates before the function lifetime, and reconnects with `Last-Event-ID`. The UI falls back to snapshot polling if SSE is unavailable.
+- **Assessment:** immediate preliminary rubric evidence has no numeric score. Retryable final AI assessment runs with Vercel Workflow and rejects stale session revisions.
+- **Execution:** all candidate checks run in a Vercel Sandbox microVM with network denied, no application environment variables, a 30-second limit, 64 KB output cap, and guaranteed shutdown.
+- **Privacy:** candidate DTOs are allow-listed. Rubric findings, anchors, hidden test source, reference fixes, AI analysis, and interviewer notes never enter candidate responses.
 
-1. **Interviewer** signs in at `/login` (shared password), creates a session on
-   `/` → gets a **candidate link** (`/review/:id`) and a private **report
-   link** (`/report/:id?key=…`).
-2. **Candidate** opens their link, reviews the PR, clicks line numbers to leave
-   comments, then submits.
-3. AI grading runs in the background (`after()` + AI Gateway) — the report page
-   shows which planted findings were caught / partially caught / missed, plus an
-   assessment of any extra comments, strengths, gaps and a 0–100 score.
-4. The candidate is moved to **Part 2 — fix the code**: they edit the files and
-   submit; the AI judges each planted defect as fixed / partially fixed / not
-   fixed and flags regressions.
+## Curated PR library
 
-## Challenges
+Ten versioned mid/senior exercises cover LRU correctness, API security, distributed rate limiting, webhook reliability, React search races and accessibility, transactional order transfer, queue idempotency, multi-tenant authorization, streaming CSV imports, and flaky asynchronous tests. Each session snapshots its entire challenge version so later library changes cannot alter a live or historical interview.
 
-| Challenge | Languages | What it tests |
-| --- | --- | --- |
-| LRU cache implementation | JavaScript, TypeScript, Python | Data-structure correctness: recency updates, eviction order, capacity validation |
-| Users REST API | JavaScript (Express), Python (FastAPI) | SQL injection, leaked password hashes, MD5, validation, unbounded pagination, fire-and-forget DELETE |
-| API rate limiter | JavaScript, Python | Spoofable client id, memory leak, off-by-one, multi-instance design |
-| Payment webhook handler | JavaScript, Python | Signature verification, idempotency, float money math, silent failure modes |
-
-Challenges live in [`lib/challenges/`](lib/challenges). Each defines the PR
-files per language plus the planted findings; a finding's line number is
-resolved from a unique code snippet ("anchor") at load time, so nothing breaks
-when the sample code changes. Adding a challenge = adding one file and
-registering it in [`lib/challenges/index.ts`](lib/challenges/index.ts).
-
-## Setup
+## Local setup
 
 ```bash
-npm install
-cp .env.example .env.local   # fill in AI_GATEWAY_API_KEY + INTERVIEWER_PASSWORD
-npm run dev
+pnpm install
+cp .env.example .env.local
+pnpm db:migrate
+pnpm dev
 ```
 
-Deploy with `vercel deploy` (or `vercel deploy --prod`) and set the same env
-vars on the project.
+For UI-only local work without Neon, set `INTERVIEW_DEMO_MODE=1`. Production fails closed if `DATABASE_URL` is absent. Use `vercel link && vercel env pull .env.local` to obtain local Workflow/Sandbox credentials.
 
-## Known limitations (MVP)
+## Verification
 
-- **Sessions are stored in memory** (`lib/store.ts`). Fine locally and for
-  short interviews on a warm instance, but not durable on serverless — swap the
-  store for Redis/Postgres from the Vercel Marketplace before real use. The
-  rest of the app only talks to the store module's functions.
-- Interviewer auth is a single shared password in an env var; the report link
-  additionally requires the per-session key.
-- The fix phase uses a plain textarea, not a full code editor.
+```bash
+pnpm lint
+pnpm typecheck
+pnpm test
+pnpm test:e2e
+pnpm build
+```
+
+Database integration tests should run against an isolated Neon branch via `DATABASE_URL`; never point destructive test fixtures at production.

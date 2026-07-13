@@ -5,7 +5,7 @@ import { LANGUAGE_LABELS, type JobStatus, type Language, type SessionStatus } fr
 
 interface SessionRow {
   id: string;
-  interviewerKey: string;
+  reportUrl: string;
   challengeTitle: string;
   language: Language;
   candidateName: string;
@@ -62,8 +62,7 @@ export function SessionList() {
   if (sessions.length === 0) {
     return (
       <p className="rounded-lg border border-dashed border-neutral-300 p-6 text-center text-sm text-neutral-500 dark:border-neutral-700">
-        No sessions yet — create one above. (Sessions live in memory and reset
-        when the server restarts.)
+        No durable sessions yet — create one above.
       </p>
     );
   }
@@ -116,16 +115,10 @@ export function SessionList() {
               </td>
               <td className="px-4 py-3">
                 <a
-                  href={`/review/${s.id}`}
-                  className="mr-3 text-indigo-600 hover:underline dark:text-indigo-400"
+                  href={s.reportUrl}
+                  className="text-indigo-600 hover:underline"
                 >
-                  candidate
-                </a>
-                <a
-                  href={`/report/${s.id}?key=${s.interviewerKey}`}
-                  className="text-indigo-600 hover:underline dark:text-indigo-400"
-                >
-                  report
+                  live review
                 </a>
               </td>
             </tr>

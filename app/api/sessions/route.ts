@@ -2,17 +2,22 @@ import { NextRequest, NextResponse } from "next/server";
 import { isInterviewerRequest } from "@/lib/auth";
 import { challenges, getChallenge, getVariant } from "@/lib/challenges";
 import { createSession, listSessions } from "@/lib/store";
+import { acceptsJson, isSameOrigin } from "@/lib/server/request-security";
 import type { Language } from "@/lib/types";
+import { z } from "zod";
+
+const createSchema = z.object({ challengeId: z.string().max(80), language: z.enum(["javascript", "typescript", "python"]), candidateName: z.string().trim().max(100).optional() });
 
 export async function POST(req: NextRequest) {
   if (!isInterviewerRequest(req)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const body = await req.json().catch(() => null);
-  const challengeId = body?.challengeId as string | undefined;
-  const language = body?.language as Language | undefined;
-  const candidateName = ((body?.candidateName as string) ?? "").trim();
+  if (!isSameOrigin(req) || !acceptsJson(req)) return NextResponse.json({ error: "Invalid request origin or content type" }, { status: 403 });
+  const parsed = createSchema.safeParse(await req.json().catch(() => null));
+  if (!parsed.success) return NextResponse.json({ error: "Invalid session details" }, { status: 400 });
+  const { challengeId, language } = parsed.data;
+  const candidateName = parsed.data.candidateName || "Candidate";
 
   const challenge = challengeId ? getChallenge(challengeId) : undefined;
   if (!challenge || !language || !getVariant(challenge, language)) {
@@ -22,15 +27,13 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const session = createSession({
-    challengeId: challenge.id,
-    language,
-    candidateName: candidateName || "Candidate",
-  });
+  const created = await createSession({ challenge, language: language as Language, candidateName });
+  const origin = req.nextUrl.origin;
 
   return NextResponse.json({
-    id: session.id,
-    interviewerKey: session.interviewerKey,
+    id: created.session.id,
+    candidateUrl: `${origin}/review/${created.candidateToken}`,
+    reportUrl: `${origin}/report/${created.session.id}?key=${created.reportToken}`,
   });
 }
 
@@ -39,13 +42,14 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const sessions = listSessions().map((s) => {
-    const challenge = getChallenge(s.challengeId);
+  const items = (await listSessions()).map(({ session: s, reportToken }) => {
+    const challenge = s.challenge;
     return {
       id: s.id,
-      interviewerKey: s.interviewerKey,
-      challengeId: s.challengeId,
-      challengeTitle: challenge?.title ?? s.challengeId,
+      reportUrl: `${req.nextUrl.origin}/report/${s.id}?key=${reportToken}`,
+      challengeId: challenge.id,
+      challengeTitle: challenge.title,
+      difficulty: challenge.difficulty,
       language: s.language,
       candidateName: s.candidateName,
       createdAt: s.createdAt,
@@ -56,5 +60,5 @@ export async function GET(req: NextRequest) {
       score: s.grading?.score ?? null,
     };
   });
-  return NextResponse.json({ sessions, challenges: challenges.map((c) => c.id) });
+  return NextResponse.json({ sessions: items, challenges: challenges.map((c) => c.id) });
 }

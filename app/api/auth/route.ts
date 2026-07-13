@@ -4,8 +4,10 @@ import {
   INTERVIEWER_AUTH_COOKIE,
   isValidInterviewerPassword,
 } from "@/lib/auth";
+import { acceptsJson, isSameOrigin } from "@/lib/server/request-security";
 
 export async function POST(req: NextRequest) {
+  if (!isSameOrigin(req) || !acceptsJson(req)) return NextResponse.json({ error: "Invalid request" }, { status: 403 });
   const body = await req.json().catch(() => null);
   const password = (body?.password as string | undefined) ?? "";
   const sessionValue = createInterviewerSessionValue();

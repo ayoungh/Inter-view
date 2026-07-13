@@ -7,7 +7,7 @@ import { ReviewWorkspace } from "@/components/ReviewWorkspace";
 import { FixWorkspace } from "@/components/FixWorkspace";
 
 export default function CandidatePage() {
-  const { id } = useParams<{ id: string }>();
+  const { id: token } = useParams<{ id: string }>();
   const [session, setSession] = useState<CandidateSession | null>(null);
   const [notFound, setNotFound] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
@@ -16,7 +16,7 @@ export default function CandidatePage() {
     let cancelled = false;
 
     async function load() {
-      const res = await fetch(`/api/sessions/${id}`);
+      const res = await fetch(`/api/candidate/${token}`);
       if (cancelled) return;
 
       if (res.status === 404) {
@@ -34,7 +34,7 @@ export default function CandidatePage() {
     return () => {
       cancelled = true;
     };
-  }, [id, reloadKey]);
+  }, [token, reloadKey]);
 
   if (notFound) {
     return (
@@ -59,6 +59,7 @@ export default function CandidatePage() {
     return (
       <ReviewWorkspace
         session={session}
+        token={token}
         onPhaseChange={() => {
           setSession(null);
           setReloadKey((value) => value + 1);
@@ -70,6 +71,7 @@ export default function CandidatePage() {
     return (
       <FixWorkspace
         session={session}
+        token={token}
         onPhaseChange={() => {
           setSession(null);
           setReloadKey((value) => value + 1);
