@@ -70,7 +70,7 @@ export function CreateSessionForm({
   }
 
   return (
-    <section className="rounded-xl border border-neutral-200 bg-white p-6 shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
+    <section className="rounded-xl border border-neutral-200 bg-white p-6 text-neutral-900 shadow-sm dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-100">
       <h2 className="mb-4 text-lg font-semibold">New interview</h2>
 
       <div className="grid gap-3 sm:grid-cols-2">
@@ -86,7 +86,7 @@ export function CreateSessionForm({
             }`}
           >
             <div className="flex items-center justify-between gap-2">
-              <span className="font-medium">{c.title}</span>
+              <span className="font-medium text-neutral-900 dark:text-neutral-100">{c.title}</span>
               <span className="shrink-0 rounded-full bg-neutral-100 px-2 py-0.5 text-xs text-neutral-500">
                 {c.difficulty} · {c.findingCount} rubric areas
               </span>
@@ -104,7 +104,7 @@ export function CreateSessionForm({
           <select
             value={language}
             onChange={(e) => setLanguage(e.target.value as Language)}
-            className="rounded-md border border-neutral-300 bg-white px-3 py-2 dark:border-neutral-700 dark:bg-neutral-800"
+            className="rounded-md border border-neutral-300 bg-white px-3 py-2 text-neutral-900 dark:border-neutral-600 dark:bg-neutral-800 dark:text-neutral-100"
           >
             {(selected?.languages ?? []).map((lang) => (
               <option key={lang} value={lang}>
@@ -120,7 +120,7 @@ export function CreateSessionForm({
             value={candidateName}
             onChange={(e) => setCandidateName(e.target.value)}
             placeholder="Ada Lovelace"
-            className="rounded-md border border-neutral-300 bg-white px-3 py-2 dark:border-neutral-700 dark:bg-neutral-800"
+            className="rounded-md border border-neutral-300 bg-white px-3 py-2 text-neutral-900 placeholder:text-neutral-400 dark:border-neutral-600 dark:bg-neutral-800 dark:text-neutral-100 dark:placeholder:text-neutral-500"
           />
         </label>
 

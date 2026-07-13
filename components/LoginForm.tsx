@@ -38,8 +38,8 @@ export function LoginForm() {
   }
 
   return (
-    <main className="mx-auto flex min-h-screen w-full max-w-md flex-col justify-center px-6 py-16">
-      <div className="rounded-2xl border border-neutral-200 bg-white p-8 shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
+    <main className="console-page mx-auto flex min-h-screen w-full max-w-md flex-col justify-center px-6 py-16">
+      <div className="rounded-2xl border border-neutral-200 bg-white p-8 text-neutral-900 shadow-sm dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-100">
         <p className="text-xs uppercase tracking-[0.2em] text-neutral-500">
           Inter-View
         </p>
@@ -55,7 +55,7 @@ export function LoginForm() {
               type="password"
               value={password}
               onChange={(event) => setPassword(event.target.value)}
-              className="w-full rounded-md border border-neutral-300 bg-white px-3 py-2 dark:border-neutral-700 dark:bg-neutral-800"
+              className="w-full rounded-md border border-neutral-300 bg-white px-3 py-2 text-neutral-900 dark:border-neutral-600 dark:bg-neutral-800 dark:text-neutral-100"
               autoFocus
               required
             />

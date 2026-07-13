@@ -15,7 +15,7 @@ export default function Home() {
   }));
 
   return (
-    <main className="mx-auto w-full max-w-5xl flex-1 px-6 py-10">
+    <main className="console-page mx-auto w-full max-w-5xl flex-1 px-6 py-10">
       <header className="mb-10">
         <h1 className="text-3xl font-bold tracking-tight">
           Inter-View
@@ -31,7 +31,7 @@ export default function Home() {
 
       <CreateSessionForm challenges={challengeSummaries} />
 
-      <h2 className="mt-12 mb-4 text-lg font-semibold">Sessions</h2>
+        <h2 className="mt-12 mb-4 text-lg font-semibold dark:text-neutral-100">Sessions</h2>
       <SessionList />
     </main>
   );

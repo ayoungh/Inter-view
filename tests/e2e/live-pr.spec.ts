@@ -1,5 +1,27 @@
 import { expect, test } from "@playwright/test";
 
+test("interviewer console remains readable in dark mode", async ({ page }) => {
+  await page.emulateMedia({ colorScheme: "dark" });
+  await page.goto("/login");
+  await page.getByLabel(/password/i).fill("playwright-secret");
+  await page.getByRole("button", { name: /sign in/i }).click();
+  await expect(page.getByText("New interview")).toBeVisible();
+
+  const palette = await page.evaluate(() => {
+    const body = getComputedStyle(document.body);
+    const section = getComputedStyle(document.querySelector("section")!);
+    const title = getComputedStyle(document.querySelector("section button span.font-medium")!);
+    const input = getComputedStyle(document.querySelector("input")!);
+    return { bodyBackground: body.backgroundColor, sectionBackground: section.backgroundColor, sectionText: section.color, titleText: title.color, inputBackground: input.backgroundColor, inputText: input.color };
+  });
+
+  expect(palette.bodyBackground).not.toBe("rgb(255, 255, 255)");
+  expect(palette.sectionBackground).not.toBe("rgb(255, 255, 255)");
+  expect(palette.sectionText).not.toBe(palette.sectionBackground);
+  expect(palette.titleText).not.toBe(palette.sectionBackground);
+  expect(palette.inputText).not.toBe(palette.inputBackground);
+});
+
 test("creates a capability session and keeps AI evidence private", async ({ page, context }) => {
   await page.goto("/login");
   await page.getByLabel(/password/i).fill("playwright-secret");

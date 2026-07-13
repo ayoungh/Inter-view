@@ -57,7 +57,7 @@ export function SessionList() {
   }, []);
 
   if (!sessions) {
-    return <p className="text-sm text-neutral-500">Loading…</p>;
+    return <p className="text-sm text-neutral-500 dark:text-neutral-400">Loading…</p>;
   }
   if (sessions.length === 0) {
     return (
@@ -68,7 +68,7 @@ export function SessionList() {
   }
 
   return (
-    <div className="overflow-x-auto rounded-xl border border-neutral-200 dark:border-neutral-800">
+    <div className="overflow-x-auto rounded-xl border border-neutral-200 bg-white text-neutral-900 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-100">
       <table className="w-full text-sm">
         <thead className="bg-neutral-50 text-left text-xs uppercase tracking-wide text-neutral-500 dark:bg-neutral-900">
           <tr>
@@ -85,7 +85,7 @@ export function SessionList() {
           {sessions.map((s) => (
             <tr
               key={s.id}
-              className="border-t border-neutral-200 dark:border-neutral-800"
+              className="border-t border-neutral-200 dark:border-neutral-700"
             >
               <td className="px-4 py-3 font-medium">{s.candidateName}</td>
               <td className="px-4 py-3">{s.challengeTitle}</td>
