@@ -50,4 +50,8 @@ test("creates a capability session and keeps AI evidence private", async ({ page
   }
   await expect(page.getByText("AI assessment")).toBeVisible();
   await expect(page.getByText("This path appears to keep the wrong recency order.")).toBeVisible();
+  await page.getByRole("button", { name: /get\(\) does not update recency/i }).click();
+  await expect(page.getByText("Expected answer", { exact: true })).toBeVisible();
+  await expect(page.getByText("Example fix", { exact: true })).toBeVisible();
+  await expect(page.getByText("Guide without giving it away", { exact: true })).toBeVisible();
 });
