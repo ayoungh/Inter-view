@@ -3,6 +3,7 @@ import { bigint, index, integer, jsonb, pgTable, text, timestamp, uniqueIndex, u
 export const sessions = pgTable("sessions", {
   id: uuid("id").primaryKey(),
   candidateTokenHash: text("candidate_token_hash").notNull(),
+  candidateTokenCiphertext: text("candidate_token_ciphertext"),
   reportTokenHash: text("report_token_hash").notNull(),
   reportTokenCiphertext: text("report_token_ciphertext").notNull(),
   challengeId: text("challenge_id").notNull(),

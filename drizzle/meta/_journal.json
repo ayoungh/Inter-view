@@ -8,6 +8,13 @@
       "when": 1783975355042,
       "tag": "0000_calm_morlocks",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1783978936849,
+      "tag": "0001_spooky_raider",
+      "breakpoints": true
     }
   ]
 }

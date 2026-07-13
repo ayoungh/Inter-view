@@ -27,18 +27,20 @@ test("creates a capability session and keeps AI evidence private", async ({ page
   await page.getByLabel(/password/i).fill("playwright-secret");
   await page.getByRole("button", { name: /sign in/i }).click();
   await expect(page.getByText("New interview")).toBeVisible();
-  await page.getByLabel(/candidate name/i).fill("Ada Lovelace");
-  await page.getByRole("button", { name: /create interview link/i }).click();
-  const candidateCode = page.locator("code").filter({ hasText: "/review/" });
-  await expect(candidateCode).toBeVisible();
-  const candidateUrl = await candidateCode.textContent();
-  const reportUrl = await page.locator("code").filter({ hasText: "/report/" }).textContent();
+  await page.getByLabel(/candidate or session/i).fill("Ada Lovelace");
+  const createdResponse = page.waitForResponse((response) => response.url().endsWith("/api/sessions") && response.request().method() === "POST");
+  await page.getByRole("button", { name: /create interview$/i }).click();
+  const created = await (await createdResponse).json();
+  const candidateUrl = created.candidateUrl as string;
+  const reportUrl = created.reportUrl as string;
+  await expect(page.getByRole("button", { name: /copy candidate link/i })).toBeVisible();
+  await expect(page.getByLabel("New interview").getByRole("link", { name: /open live room/i })).toBeVisible();
   expect(candidateUrl).toBeTruthy(); expect(reportUrl).toBeTruthy();
 
   const candidate = await context.newPage();
   await candidate.goto(candidateUrl!);
   await expect(candidate.getByRole("button", { name: /files changed/i })).toBeVisible();
-  await candidate.getByRole("button", { name: /comment on line/i }).first().click();
+  await candidate.getByRole("button", { name: "Comment on line 11", exact: true }).click();
   await candidate.getByPlaceholder(/leave feedback/i).fill("This path appears to keep the wrong recency order.");
   await candidate.getByRole("button", { name: /start a review/i }).click();
   await expect(candidate.getByText(/draft comment/)).toBeVisible();
@@ -46,12 +48,14 @@ test("creates a capability session and keeps AI evidence private", async ({ page
 
   await page.goto(reportUrl!);
   if ((page.viewportSize()?.width ?? 1000) < 1050) {
-    await page.getByRole("button", { name: "Toggle AI assessment" }).click();
+    await page.getByRole("button", { name: "Toggle interviewer guide" }).click();
   }
-  await expect(page.getByText("AI assessment")).toBeVisible();
+  await expect(page.getByText("Interviewer guide")).toBeVisible();
   await expect(page.getByText("This path appears to keep the wrong recency order.")).toBeVisible();
   await page.getByRole("button", { name: /get\(\) does not update recency/i }).click();
-  await expect(page.getByText("Expected answer", { exact: true })).toBeVisible();
-  await expect(page.getByText("Example fix", { exact: true })).toBeVisible();
-  await expect(page.getByText("Guide without giving it away", { exact: true })).toBeVisible();
+  await expect(page.getByText("What good looks like", { exact: true })).toBeVisible();
+  await expect(page.getByText("Evidence cited by AI", { exact: true })).toBeVisible();
+  await expect(page.getByText("Follow-up prompts", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Confirm" }).click();
+  await expect(page.getByText("Evidence confirmed", { exact: true })).toBeVisible();
 });

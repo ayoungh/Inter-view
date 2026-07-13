@@ -35,6 +35,7 @@ export interface FindingDef {
   description: string;
   category: FindingCategory;
   severity: FindingSeverity;
+  interviewerPrompts?: string[];
 }
 
 export interface FindingAnchor {
@@ -81,6 +82,8 @@ export interface Challenge {
   id: string;
   version: number;
   difficulty: Difficulty;
+  estimatedMinutes: number;
+  competencies: string[];
   title: string;
   summary: string;
   prTitle: string;
@@ -211,7 +214,9 @@ export type SessionEventType =
   | "check.completed"
   | "assessment.updated"
   | "fix.submitted"
-  | "note.updated";
+  | "note.updated"
+  | "rubric.decision.updated"
+  | "interview.decision.updated";
 
 export interface SessionEvent {
   id: number;
@@ -227,12 +232,31 @@ export interface InterviewerNote {
   updatedAt: number;
 }
 
+export type InterviewerDecisionVerdict = "confirmed" | "adjusted" | "insufficient";
+
+export interface InterviewerRubricDecision {
+  findingId: string;
+  verdict: InterviewerDecisionVerdict;
+  adjustedState?: RubricState;
+  note: string;
+  updatedAt: number;
+}
+
+export type InterviewOutcome = "strong-yes" | "yes" | "mixed" | "no" | "strong-no";
+
+export interface InterviewDecision {
+  outcome: InterviewOutcome;
+  note: string;
+  updatedAt: number;
+}
+
 export interface SessionSnapshot {
   id: string;
   challenge: Challenge;
   language: Language;
   candidateName: string;
   createdAt: number;
+  updatedAt?: number;
   status: SessionStatus;
   comments: ReviewComment[];
   overallNote: string;
@@ -251,6 +275,8 @@ export interface SessionSnapshot {
   checkRuns: CheckRun[];
   liveAssessment?: LiveAssessment;
   interviewerNote?: InterviewerNote;
+  interviewerDecisions?: InterviewerRubricDecision[];
+  interviewDecision?: InterviewDecision;
 }
 
 /** Server-side grading input. Access tokens are deliberately not part of it. */

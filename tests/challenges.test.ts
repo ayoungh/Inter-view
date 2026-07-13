@@ -10,6 +10,9 @@ describe("curated challenge registry", () => {
       expect(["mid", "senior"]).toContain(challenge.difficulty);
       expect(challenge.findings.length).toBeGreaterThanOrEqual(4);
       expect(challenge.findings.length).toBeLessThanOrEqual(7);
+      expect(challenge.estimatedMinutes).toBeGreaterThanOrEqual(30);
+      expect(challenge.competencies.length).toBeGreaterThan(0);
+      for (const finding of challenge.findings) expect(finding.interviewerPrompts?.length).toBeGreaterThan(0);
     }
   });
 

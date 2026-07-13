@@ -3,10 +3,10 @@ import "server-only";
 import { randomUUID } from "node:crypto";
 import { neon, type NeonQueryFunctionInTransaction } from "@neondatabase/serverless";
 import { getVariant, resolveFindings } from "./challenges";
-import type { Challenge, ChallengeFile, CheckRun, FileRevision, Language, LiveAssessment, ReviewComment, Session, SessionEvent, SessionEventType } from "./types";
+import type { Challenge, ChallengeFile, CheckRun, FileRevision, InterviewDecision, InterviewerRubricDecision, Language, LiveAssessment, ReviewComment, Session, SessionEvent, SessionEventType } from "./types";
 import { createToken, hashToken, sealToken, tokenMatches, unsealToken } from "./server/tokens";
 
-interface StoredSession { snapshot: Session; candidateTokenHash: string; reportTokenHash: string; reportTokenCiphertext: string }
+interface StoredSession { snapshot: Session; candidateTokenHash: string; candidateTokenCiphertext?: string; reportTokenHash: string; reportTokenCiphertext: string }
 interface DemoState { sessions: Map<string, StoredSession>; events: SessionEvent[]; cursor: number }
 const globalState = globalThis as typeof globalThis & { __interviewDemo?: DemoState };
 const demo = (globalState.__interviewDemo ??= { sessions: new Map<string, StoredSession>(), events: [] as SessionEvent[], cursor: 0 });
@@ -44,20 +44,21 @@ export async function createSession(input: { challenge: Challenge; language: Lan
     language: input.language,
     candidateName: input.candidateName,
     createdAt: now,
+    updatedAt: now,
     status: "review",
     comments: [], overallNote: "", gradingStatus: "none", fixStatus: "none",
     revision: 0, checkRuns: [],
   };
-  const stored: StoredSession = { snapshot, candidateTokenHash: hashToken(candidateToken), reportTokenHash: hashToken(reportToken), reportTokenCiphertext: sealToken(reportToken) };
+  const stored: StoredSession = { snapshot, candidateTokenHash: hashToken(candidateToken), candidateTokenCiphertext: sealToken(candidateToken), reportTokenHash: hashToken(reportToken), reportTokenCiphertext: sealToken(reportToken) };
   if (!databaseEnabled()) {
     demo.sessions.set(id, stored);
-    demo.events.push(event(id, "session.created", "system", { challengeId: input.challenge.id, language: input.language }));
+    demo.events.push(event(id, "session.created", "system", { challengeId: input.challenge.id, language: input.language, candidateName: input.candidateName }));
     return { session: snapshot, candidateToken, reportToken };
   }
   const sql = db();
-  const initialEvent = { challengeId: input.challenge.id, language: input.language };
+  const initialEvent = { challengeId: input.challenge.id, language: input.language, candidateName: input.candidateName };
   await sql.transaction((tx) => [
-    tx`INSERT INTO sessions (id, candidate_token_hash, report_token_hash, report_token_ciphertext, challenge_id, challenge_version, language, candidate_name, status, revision, snapshot) VALUES (${id}, ${stored.candidateTokenHash}, ${stored.reportTokenHash}, ${stored.reportTokenCiphertext}, ${input.challenge.id}, ${input.challenge.version}, ${input.language}, ${input.candidateName}, 'review', 0, ${JSON.stringify(snapshot)}::jsonb)`,
+    tx`INSERT INTO sessions (id, candidate_token_hash, candidate_token_ciphertext, report_token_hash, report_token_ciphertext, challenge_id, challenge_version, language, candidate_name, status, revision, snapshot) VALUES (${id}, ${stored.candidateTokenHash}, ${stored.candidateTokenCiphertext}, ${stored.reportTokenHash}, ${stored.reportTokenCiphertext}, ${input.challenge.id}, ${input.challenge.version}, ${input.language}, ${input.candidateName}, 'review', 0, ${JSON.stringify(snapshot)}::jsonb)`,
     ...variant.files.map((file) => tx`INSERT INTO session_files (id, session_id, path, status, base_content, head_content, saved_content) VALUES (${randomUUID()}, ${id}, ${file.path}, ${file.status}, ${file.baseContent}, ${file.headContent}, ${file.savedContent ?? null})`),
     tx`INSERT INTO session_events (session_id, type, actor, payload) VALUES (${id}, 'session.created', 'system', ${JSON.stringify(initialEvent)}::jsonb)`,
   ]);
@@ -66,9 +67,9 @@ export async function createSession(input: { challenge: Challenge; language: Lan
 
 async function rowById(id: string): Promise<StoredSession | undefined> {
   if (!databaseEnabled()) return demo.sessions.get(id);
-  const rows = await db()`SELECT snapshot, candidate_token_hash, report_token_hash, report_token_ciphertext FROM sessions WHERE id = ${id} LIMIT 1`;
+  const rows = await db()`SELECT snapshot, candidate_token_hash, candidate_token_ciphertext, report_token_hash, report_token_ciphertext FROM sessions WHERE id = ${id} LIMIT 1`;
   const row = rows[0] as Record<string, unknown> | undefined;
-  return row ? { snapshot: row.snapshot as Session, candidateTokenHash: String(row.candidate_token_hash), reportTokenHash: String(row.report_token_hash), reportTokenCiphertext: String(row.report_token_ciphertext) } : undefined;
+  return row ? { snapshot: row.snapshot as Session, candidateTokenHash: String(row.candidate_token_hash), candidateTokenCiphertext: row.candidate_token_ciphertext ? String(row.candidate_token_ciphertext) : undefined, reportTokenHash: String(row.report_token_hash), reportTokenCiphertext: String(row.report_token_ciphertext) } : undefined;
 }
 
 export async function getCandidateSession(token: string) {
@@ -103,13 +104,14 @@ export async function applyLiveWorkflowResult(id: string, basedOnRevision: numbe
 }
 
 export async function listSessions() {
-  if (!databaseEnabled()) return [...demo.sessions.values()].sort((a, b) => b.snapshot.createdAt - a.snapshot.createdAt).map((item) => ({ session: item.snapshot, reportToken: unsealToken(item.reportTokenCiphertext) }));
-  const rows = await db()`SELECT snapshot, report_token_ciphertext FROM sessions ORDER BY created_at DESC LIMIT 100`;
-  return rows.map((row) => ({ session: row.snapshot as Session, reportToken: unsealToken(String(row.report_token_ciphertext)) }));
+  if (!databaseEnabled()) return [...demo.sessions.values()].sort((a, b) => b.snapshot.createdAt - a.snapshot.createdAt).map((item) => ({ session: item.snapshot, candidateToken: item.candidateTokenCiphertext ? unsealToken(item.candidateTokenCiphertext) : undefined, reportToken: unsealToken(item.reportTokenCiphertext) }));
+  const rows = await db()`SELECT snapshot, candidate_token_ciphertext, report_token_ciphertext FROM sessions ORDER BY updated_at DESC LIMIT 100`;
+  return rows.map((row) => ({ session: row.snapshot as Session, candidateToken: row.candidate_token_ciphertext ? unsealToken(String(row.candidate_token_ciphertext)) : undefined, reportToken: unsealToken(String(row.report_token_ciphertext)) }));
 }
 
 async function saveSnapshot(stored: StoredSession, type: SessionEventType, actor: SessionEvent["actor"], payload: Record<string, unknown>, extraQueries: ((tx: NeonQueryFunctionInTransaction<false, false>) => unknown)[] = []) {
   const snapshot = stored.snapshot;
+  snapshot.updatedAt = Date.now();
   if (!databaseEnabled()) {
     demo.sessions.set(snapshot.id, stored);
     demo.events.push(event(snapshot.id, type, actor, payload));
@@ -228,6 +230,26 @@ export async function updateNote(id: string, reportToken: string, body: string) 
   stored.snapshot.interviewerNote = { body: body.slice(0, 20_000), updatedAt: Date.now() };
   await saveSnapshot(stored, "note.updated", "interviewer", {}, [(tx) => tx`INSERT INTO interviewer_notes (session_id, body, updated_at) VALUES (${id}, ${stored.snapshot.interviewerNote!.body}, ${new Date(stored.snapshot.interviewerNote!.updatedAt)}) ON CONFLICT (session_id) DO UPDATE SET body = EXCLUDED.body, updated_at = EXCLUDED.updated_at`]);
   return stored.snapshot.interviewerNote;
+}
+
+export async function updateRubricDecision(id: string, reportToken: string, decision: Omit<InterviewerRubricDecision, "updatedAt">) {
+  const session = await getInterviewerSession(id, reportToken); if (!session) return undefined;
+  const stored = await rowById(id); if (!stored) return undefined;
+  if (!resolveFindings(stored.snapshot.challenge, stored.snapshot.language).some((finding) => finding.id === decision.findingId)) return undefined;
+  const item: InterviewerRubricDecision = { ...decision, note: decision.note.slice(0, 2_000), updatedAt: Date.now() };
+  const decisions = stored.snapshot.interviewerDecisions ?? [];
+  stored.snapshot.interviewerDecisions = [...decisions.filter((entry) => entry.findingId !== item.findingId), item];
+  await saveSnapshot(stored, "rubric.decision.updated", "interviewer", { findingId: item.findingId, verdict: item.verdict, adjustedState: item.adjustedState });
+  return item;
+}
+
+export async function updateInterviewDecision(id: string, reportToken: string, decision: Omit<InterviewDecision, "updatedAt">) {
+  const session = await getInterviewerSession(id, reportToken); if (!session || session.status !== "completed") return undefined;
+  const stored = await rowById(id); if (!stored) return undefined;
+  const item: InterviewDecision = { ...decision, note: decision.note.slice(0, 10_000), updatedAt: Date.now() };
+  stored.snapshot.interviewDecision = item;
+  await saveSnapshot(stored, "interview.decision.updated", "interviewer", { outcome: item.outcome });
+  return item;
 }
 
 async function updateLiveAssessment(stored: StoredSession, basedOnEventId: number) {

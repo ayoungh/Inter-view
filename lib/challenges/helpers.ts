@@ -28,6 +28,8 @@ interface ChallengeSource {
   id: string;
   version?: number;
   difficulty?: Difficulty;
+  estimatedMinutes?: number;
+  competencies?: string[];
   title: string;
   summary: string;
   prTitle: string;
@@ -36,6 +38,13 @@ interface ChallengeSource {
   metadata?: Partial<ChallengeMetadata>;
   findings: FindingDef[];
   variants: Partial<Record<Language, SourceVariant>>;
+}
+
+function promptForFinding(finding: FindingDef): string[] {
+  const lead = finding.severity === "critical" ? "What failure would this cause in production?" : "What would you change here, and why?";
+  return finding.interviewerPrompts?.length
+    ? finding.interviewerPrompts
+    : [lead, `How would you test that ${finding.title.toLowerCase()} is resolved?`];
 }
 
 const DIFFICULTY: Record<string, Difficulty> = {
@@ -87,6 +96,7 @@ function defaultChecks(language: Language, sourcePath: string, markers: string[]
 }
 
 export function defineChallenge(source: ChallengeSource): Challenge {
+  const difficulty = source.difficulty ?? DIFFICULTY[source.id] ?? "mid";
   const variants: Challenge["variants"] = {};
   for (const [language, raw] of Object.entries(source.variants) as Array<
     [Language, SourceVariant]
@@ -121,7 +131,9 @@ export function defineChallenge(source: ChallengeSource): Challenge {
   return {
     id: source.id,
     version: source.version ?? 2,
-    difficulty: source.difficulty ?? DIFFICULTY[source.id] ?? "mid",
+    difficulty,
+    estimatedMinutes: source.estimatedMinutes ?? (difficulty === "senior" ? 60 : 45),
+    competencies: source.competencies ?? [...new Set(source.findings.map((finding) => finding.category))],
     title: source.title,
     summary: source.summary,
     prTitle: source.prTitle,
@@ -135,7 +147,7 @@ export function defineChallenge(source: ChallengeSource): Challenge {
       prNumber: source.metadata?.prNumber ?? 100 + source.id.length,
       author: source.metadata?.author ?? "maya-chen",
     },
-    findings: source.findings,
+    findings: source.findings.map((finding) => ({ ...finding, interviewerPrompts: promptForFinding(finding) })),
     variants,
   };
 }

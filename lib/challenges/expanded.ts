@@ -14,6 +14,7 @@ interface ScenarioFinding {
   category: FindingCategory;
   severity: FindingSeverity;
   anchor: string;
+  interviewerPrompts?: string[];
 }
 
 interface ScenarioLanguage {
@@ -34,6 +35,8 @@ interface Scenario {
   description: string;
   instructions: string;
   repository: string;
+  estimatedMinutes?: number;
+  competencies?: string[];
   findings: ScenarioFinding[];
   languages: ScenarioLanguage[];
 }
@@ -124,6 +127,8 @@ function scenario(source: Scenario) {
     id: source.id,
     version: 1,
     difficulty: source.difficulty,
+    estimatedMinutes: source.estimatedMinutes,
+    competencies: source.competencies,
     title: source.title,
     summary: source.summary,
     prTitle: source.prTitle,
@@ -134,7 +139,7 @@ function scenario(source: Scenario) {
       headBranch: `feature/${source.id}`,
       prNumber: 200 + source.id.length,
     },
-    findings: source.findings.map((finding) => ({ id: finding.id, title: finding.title, description: finding.description, category: finding.category, severity: finding.severity })),
+    findings: source.findings.map((finding) => ({ id: finding.id, title: finding.title, description: finding.description, category: finding.category, severity: finding.severity, interviewerPrompts: finding.interviewerPrompts ?? [] })),
     variants: Object.fromEntries(
       source.languages.map((language) => {
         const python = language.language === "python";

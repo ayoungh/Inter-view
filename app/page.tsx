@@ -12,6 +12,8 @@ export default function Home() {
     languages: Object.keys(c.variants) as Language[],
     findingCount: c.findings.length,
     difficulty: c.difficulty,
+    estimatedMinutes: c.estimatedMinutes,
+    competencies: c.competencies,
   }));
 
   return (
